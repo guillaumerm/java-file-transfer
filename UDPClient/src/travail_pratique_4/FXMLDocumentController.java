@@ -14,6 +14,8 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,9 +35,7 @@ public class FXMLDocumentController implements Initializable {
     private UDPClient client;
     private File fichier;
     private InetAddress addressDestination;
-
-    @FXML
-    private Button send_button;
+    private List<byte[]> bufferTransmission;
 
     @FXML
     private TextField fileChooser_textfield;
@@ -103,6 +103,6 @@ public class FXMLDocumentController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-
+        bufferTransmission = new LinkedList();
     }
 }

@@ -5,11 +5,7 @@
  */
 package travail_pratique_4;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -24,8 +20,9 @@ import java.util.logging.Logger;
  */
 public class UDPClient {
 
-    DatagramSocket clientSocket;
-    InetAddress addressDestination;
+    private DatagramSocket clientSocket;
+    private InetAddress addressDestination;
+    private byte numeroSeq = 0;
 
     /**
      *
@@ -50,22 +47,9 @@ public class UDPClient {
      * @param data
      */
     public void sendData(byte[] data) {
-        TrameEnvoie trame = new TrameEnvoie(Trame.Type.SEQ, 0, data);
+        Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroSeq, data);
 
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
-
-        final ObjectOutputStream oos;
-        try {
-            oos = new ObjectOutputStream(baos);
-            oos.writeObject(trame);
-            oos.flush();
-            oos.close();
-        } catch (IOException ex) {
-            Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        final byte[] sendTrame = baos.toByteArray();
-        int longueur = sendTrame.length;
+        final byte[] sendTrame = trame.toBytes();
 
         DatagramPacket sendPacket = new DatagramPacket(sendTrame, sendTrame.length, addressDestination, 9786);
         try {
@@ -73,5 +57,22 @@ public class UDPClient {
         } catch (IOException ex) {
             Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
         }
+        
+        final byte[] receiveData = new byte[1024];
+        
+        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        
+        try {
+            clientSocket.receive(sendPacket);
+        } catch (IOException ex) {
+            Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        Trame trameAccuse = new Trame(sendPacket.getData());
+        
+        if(trameAccuse.numero == numeroSeq){
+            numeroSeq = (byte)(numeroSeq % 2);
+        }
+        
     }
 }
