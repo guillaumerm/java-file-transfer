@@ -23,6 +23,7 @@ public class UDPClient {
     private DatagramSocket clientSocket;
     private InetAddress addressDestination;
     private byte numeroSeq = 0;
+    private final static char END_OF_TRANSMISSION = ((char) 37);
 
     /**
      *
@@ -52,27 +53,40 @@ public class UDPClient {
         final byte[] sendTrame = trame.toBytes();
 
         DatagramPacket sendPacket = new DatagramPacket(sendTrame, sendTrame.length, addressDestination, 9786);
+
         try {
             clientSocket.send(sendPacket);
         } catch (IOException ex) {
             Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+
         final byte[] receiveData = new byte[1024];
-        
+
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-        
+
         try {
             clientSocket.receive(sendPacket);
         } catch (IOException ex) {
             Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
         }
+
+        numeroSeq = (byte) (++numeroSeq % 2);
         
         Trame trameAccuse = new Trame(sendPacket.getData());
-        
-        if(trameAccuse.numero == numeroSeq){
-            numeroSeq = (byte)(numeroSeq % 2);
+
+        if (trameAccuse.numero == numeroSeq) {
+            Trame trameEND = new Trame(Trame.TRAME_ENVOIE, numeroSeq, new byte[]{END_OF_TRANSMISSION});
+
+            final byte[] sendTrame2 = trameEND.toBytes();
+
+            DatagramPacket sendPacket2 = new DatagramPacket(sendTrame2, sendTrame2.length, addressDestination, 9786);
+            
+            try {
+                clientSocket.send(sendPacket2);
+            } catch (IOException ex) {
+                Logger.getLogger(UDPClient.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
-        
+
     }
 }

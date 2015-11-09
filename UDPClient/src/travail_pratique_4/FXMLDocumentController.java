@@ -104,5 +104,7 @@ public class FXMLDocumentController implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         bufferTransmission = new LinkedList();
+        UDPServer server = new UDPServer();
+        server.start();
     }
 }

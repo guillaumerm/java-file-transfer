@@ -24,10 +24,13 @@ import java.util.logging.Logger;
  */
 public class UDPServer {
 
-    private List<byte[]> bufferReception;
     private DatagramSocket serverSocket;
     private boolean running = true;
     private byte numeroAck = 0;
+    File file = new File("C:/Users/" + System.getProperty("user.name") + "/Downloads/text.txt");
+    private final static char END_OF_TRANSMISSION = ((char) 37);
+    private FileOutputStream out;
+    private BufferedOutputStream bos;
 
     public UDPServer() {
         try {
@@ -35,36 +38,36 @@ public class UDPServer {
         } catch (SocketException ex) {
             Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
         }
-        bufferReception = new LinkedList();
-        new Thread(new TaskWriteData()).start();
+
+        try {
+            out = new FileOutputStream(file);
+            bos = new BufferedOutputStream(out);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public void start() {
         new Thread(new TaskReceiveData()).start();
     }
 
-    public void writeFile() {
-        File file = new File("C:/Users/" + System.getProperty("user.name") + "/Downloads/text.txt");
-
+    public void writeToFile(byte[] message) {
         try {
-            FileOutputStream out = new FileOutputStream(file);
-            BufferedOutputStream bos = new BufferedOutputStream(out);
-            try {
-                while (running) {
-                    if (!bufferReception.isEmpty()) {
-                        out.write(bufferReception.get(numeroAck));
-                    } else {
-                        try {
-                            Thread.sleep(5000);
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
+            if (message != null) {
+                if (message[0] == END_OF_TRANSMISSION) {
+                    out.flush();
+                    out.close();
+                } else {
+                    out.write(message);
                 }
-
-                out.flush();
-                out.close();
-            } catch (IOException ex) {
-                Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
+            } else {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
-        } catch (FileNotFoundException ex) {
+        } catch (IOException ex) {
             Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -83,23 +86,30 @@ public class UDPServer {
 
             Trame trameEnvoie = new Trame(receivePacket.getData());
 
-            bufferReception.add(trameEnvoie.numero, trameEnvoie.message);
-
-            String accusee = "ACK pour SEQ " + trameEnvoie.numero;
-
             if (trameEnvoie.numero == numeroAck) {
-                numeroAck = (byte) (numeroAck % 2);
+                writeToFile(trameEnvoie.message);
+
+                String accusee = "ACK pour SEQ " + trameEnvoie.numero;
+
+                numeroAck = (byte) (++numeroAck % 2);
+
+                Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAck, accusee.getBytes());
+
+                DatagramPacket sendPacket = new DatagramPacket(trameAccuse.toBytes(), trameAccuse.toBytes().length, receivePacket.getAddress(), receivePacket.getPort());
+
+                try {
+                    serverSocket.send(sendPacket);
+                } catch (IOException ex) {
+                    Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
 
-            Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAck, accusee.getBytes());
-
-            DatagramPacket sendPacket = new DatagramPacket(trameAccuse.toBytes(), trameAccuse.toBytes().length, receivePacket.getAddress(), receivePacket.getPort());
-
-            try {
-                serverSocket.send(sendPacket);
-            } catch (IOException ex) {
-                Logger.getLogger(UDPServer.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -109,19 +119,5 @@ public class UDPServer {
         public void run() {
             receiveData();
         }
-
-    }
-
-    private class TaskWriteData implements Runnable {
-
-        @Override
-        public void run() {
-            writeFile();
-        }
-
-    }
-
-    public static void main(String args[]) {
-        UDPServer udpServer = new UDPServer();
     }
 }
