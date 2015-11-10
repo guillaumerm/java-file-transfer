@@ -47,7 +47,7 @@ public class NetworkModule extends Observable implements Observer {
             //TODO merge clientSocket receiving ACK and SEQ
             clientSocket = new DatagramSocket();
         } catch (SocketException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         bufferTransmission = new LinkedList();
@@ -69,7 +69,7 @@ public class NetworkModule extends Observable implements Observer {
         try {
             addressDestination = InetAddress.getByAddress(ipAddress);
         } catch (UnknownHostException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -122,18 +122,6 @@ public class NetworkModule extends Observable implements Observer {
             Trame trame = receptionTrame();
 
             if (trame.type == Trame.TRAME_ACK) {
-                if (trame.numero == numeroAck) {
-
-                    incrementerAck();
-
-                    //Remontre trame
-                    setChanged();
-                    notifyObservers(trame.message);
-
-                }
-
-                envoyerTrameAck();
-            } else if (trame.type == Trame.TRAME_ENVOIE) {
                 timer.cancel();
 
                 if (trame.numero != numeroSeq) {
@@ -153,6 +141,18 @@ public class NetworkModule extends Observable implements Observer {
                 } else {
                     envoyerTrameSeq(bufferTransmission.get(numeroSeq));
                 }
+            } else if (trame.type == Trame.TRAME_ENVOIE) {
+                if (trame.numero == numeroAck) {
+
+                    incrementerAck();
+
+                    //Remontre trame
+                    setChanged();
+                    notifyObservers(trame.message);
+
+                }
+
+                envoyerTrameAck();
             }
 
             try {
@@ -174,7 +174,7 @@ public class NetworkModule extends Observable implements Observer {
             try {
                 flag.wait();
             } catch (InterruptedException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
 
@@ -193,7 +193,7 @@ public class NetworkModule extends Observable implements Observer {
         try {
             clientSocket.send(sendPacket);
         } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -231,7 +231,7 @@ public class NetworkModule extends Observable implements Observer {
                             try {
                                 flag.wait();
                             } catch (InterruptedException ex) {
-                                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                                Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
                             }
                         }
                     }

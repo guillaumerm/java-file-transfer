@@ -26,6 +26,7 @@ public class FxTimer extends Observable {
 
             @Override
             public void run() {
+                setChanged();
                 notifyObservers();
             }
         };

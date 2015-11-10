@@ -85,14 +85,13 @@ public class FXMLDocumentController implements Initializable, Observer {
 
         networkModule.setAddress(addressDestination.getAddress());
 
-        new Thread(() -> {
-            networkModule.startClient(fichier);
-        }).start();
+
+        networkModule.startClient(fichier);
     }
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        NetworkModule networkModule = new NetworkModule(9786);
+        networkModule = new NetworkModule(9786);
         networkModule.addObserver(this);
         networkModule.startServer();
 
