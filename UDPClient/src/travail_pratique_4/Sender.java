@@ -47,7 +47,8 @@ public class Sender implements Observer {
      */
     public Sender(byte[] ipAddress) {
         try {
-            clientSocket = new DatagramSocket();
+            //TODO merge clientSocket receiving ACK and SEQ
+            clientSocket = new DatagramSocket(9786);
         } catch (SocketException ex) {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -67,57 +68,13 @@ public class Sender implements Observer {
         timer = new FxTimer(1000);
     }
 
-    public void start(File fichier) {
-        this.fichier = fichier;
 
-        new Thread(() -> {
-            readFile();
-        }).start();
 
-        synchronized (flag) {
-            try {
-                flag.wait();
-            } catch (InterruptedException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
 
-        timer.start();
 
-        envoyerTrameSeq(bufferTransmission.get(numeroSeq));
-    }
+    
 
-    private void incrementerSeq() {
-        numeroSeq = (byte) (++numeroSeq % 2);
-    }
-
-    public void envoyerTrameSeq(byte[] data) {
-        Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroSeq, data);
-
-        final byte[] sendTrame = trame.toBytes();
-
-        DatagramPacket sendPacket = new DatagramPacket(sendTrame, sendTrame.length, addressDestination, 9786);
-
-        try {
-            clientSocket.send(sendPacket);
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    public Trame receptionTrameAck() {
-        final byte[] receiveData = new byte[1024];
-
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-        try {
-            clientSocket.receive(receivePacket);
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        return new Trame(receivePacket.getData());
-    }
+    
 
     /**
      *
@@ -128,82 +85,27 @@ public class Sender implements Observer {
 
             Trame trameAccuse = receptionTrameAck();
 
-            timer.cancel();
-
-            if (trameAccuse.numero != numeroSeq) {
-
-                bufferTransmission.set(numeroSeq, null);
-
-                incrementerSeq();
-
-                synchronized (flag) {
-                    flag.notifyAll();
-                }
-
-            }
-
-            if (bufferTransmission.get(0) == null && bufferTransmission.get(1) == null) {
-                envoyerTrameSeq(new byte[]{END_OF_TRANSMISSION});
-            } else {
-                envoyerTrameSeq(bufferTransmission.get(numeroSeq));
-            }
+            
 
         }
 
     }
 
-    private void readFile() {
-
-        InputStream fis = null;
-
-        try {
-            fis = new FileInputStream(fichier);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        BufferedInputStream bis = new BufferedInputStream(fis);
-
-        byte[] data = new byte[1024];
-        int content;
-        int bytesRead = 0;
-
-        try {
-            while ((content = fis.read()) != -1) {
-                if (bufferTransmission.contains(null)) {
-                    data[bytesRead] = (byte) content;
-                    bytesRead++;
-
-                    if (bytesRead == 1024) {
-                        bufferTransmission.set(numeroSeq % 2, data.clone());
-
-                        synchronized (flag) {
-                            flag.notifyAll();
-                        }
-
-                        data = new byte[1024];
-                        bytesRead = 0;
-                    }
-                } else {
-                    synchronized (flag) {
-                        try {
-                            flag.wait();
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
-                }
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
+    
 
     @Override
     public void update(Observable o, Object arg) {
         if (o instanceof FxTimer) {
             ((FxTimer) o).cancel();
             envoyerTrameSeq(bufferTransmission.get(numeroSeq));
+        }
+    }
+    
+    private class TaskReceiveData implements Runnable{
+
+        @Override
+        public void run() {
+            OnReceiveData();
         }
     }
 }

@@ -38,7 +38,7 @@ import javafx.stage.FileChooser;
  */
 public class FXMLDocumentController implements Initializable, Observer {
 
-    private Sender client;
+    private NetworkModule networkModule;
     private File fichier;
     private InetAddress addressDestination;
     private File file = new File("C:/Users/" + System.getProperty("user.name") + "/Downloads/text.txt");
@@ -83,30 +83,30 @@ public class FXMLDocumentController implements Initializable, Observer {
             Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        client = new Sender(addressDestination.getAddress());
+        networkModule.setAddress(addressDestination.getAddress());
 
         new Thread(() -> {
-            client.start(fichier);
+            networkModule.startClient(fichier);
         }).start();
     }
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        Receiver server = new Receiver();
-        server.addObserver(this);
-        server.start();
+        NetworkModule networkModule = new NetworkModule(9786);
+        networkModule.addObserver(this);
+        networkModule.startServer();
 
         try {
             out = new FileOutputStream(file);
             bos = new BufferedOutputStream(out);
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     @Override
     public void update(Observable o, Object arg) {
-        if (o instanceof Receiver) {
+        if (o instanceof NetworkModule) {
             trame_textarea.setPrefRowCount(trame_textarea.getPrefRowCount());
             try {
                 trame_textarea.setText(new String(((byte[]) arg), "UTF-8"));
@@ -130,11 +130,11 @@ public class FXMLDocumentController implements Initializable, Observer {
                 try {
                     Thread.sleep(200);
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
         } catch (IOException ex) {
-            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(NetworkModule.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }
