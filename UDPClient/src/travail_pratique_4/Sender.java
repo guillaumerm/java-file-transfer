@@ -5,11 +5,7 @@
  */
 package travail_pratique_4;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -58,9 +54,9 @@ public class Sender extends Observable implements Observer {
     public void start() {
 
         obtenirMessage();
-        
+
         timer.start();
-        
+
         new Thread(() -> {
             envoyerTrameSeq();
             OnReceiveData();
@@ -81,9 +77,6 @@ public class Sender extends Observable implements Observer {
         byte numeroTrameTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
 
         Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroTrameTemp, bytes);
-
-        String trameMessageTemp = new String(trame.message);
-        System.out.println("Envoie: (" + trame.toString() + ") " + trameMessageTemp);
 
         final byte[] sendTrame = trame.toBytes();
 
@@ -130,9 +123,9 @@ public class Sender extends Observable implements Observer {
 
             if (trameAccuse.numero != numeroSeqTemp) {
 
-                obtenirMessage();
-
                 incrementerSeq();
+
+                obtenirMessage();
 
             }
 

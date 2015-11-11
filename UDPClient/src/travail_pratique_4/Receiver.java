@@ -62,7 +62,20 @@ public class Receiver extends Observable {
         addressDestination = receivePacket.getAddress();
         portDestination = receivePacket.getPort();
 
-        return new Trame(receivePacket.getData());
+        int index = receivePacket.getData().length - 1;
+        byte aByte = receivePacket.getData()[index];
+        int nombreByteNull = 0;
+
+        while (aByte != Trame.END_OF_TEXT) {
+            nombreByteNull++;
+            aByte = receivePacket.getData()[--index];
+        }
+        
+        byte[] trameBytes = new byte[receivePacket.getData().length - nombreByteNull];
+        
+        System.arraycopy(receivePacket.getData(), 0, trameBytes, 0, trameBytes.length);
+
+        return new Trame(trameBytes);
     }
 
     private void envoyerTrameAck() {
@@ -95,7 +108,6 @@ public class Receiver extends Observable {
 
             if (trameEnvoie.numero == numeroAckTemp) {
 
-                System.out.println("Reception: (" + trameEnvoie.toString() + ") " + new String(trameEnvoie.message));
                 incrementerAck();
 
                 //Remontre trame

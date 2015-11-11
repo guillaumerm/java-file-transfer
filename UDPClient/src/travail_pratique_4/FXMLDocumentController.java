@@ -5,7 +5,6 @@
  */
 package travail_pratique_4;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -35,11 +34,13 @@ import javafx.stage.FileChooser;
 public class FXMLDocumentController implements Initializable, Observer {
 
     private Sender client;
-    private File fichier;
+    private File fichierSortant;
     private InetAddress addressDestination;
-    private File file = new File("C:/Users/" + System.getProperty("user.name") + "/Downloads/text.txt");
+    private String pathDownload = "C:/Users/" + System.getProperty("user.name") + "/Downloads/";
+    private File fichierEntrant = null;
     private final static char END_OF_TRANSMISSION = ((char) 37);
     private final static char DATA_LINK_ESCAPE = ((char) 16);
+    private final static char START_OF_HEADING = ((char) 1);
     private FileOutputStream out = null;
     private InputStream fis = null;
     private boolean isClosed = true;
@@ -69,8 +70,8 @@ public class FXMLDocumentController implements Initializable, Observer {
         File fichierTemp = chooser.showOpenDialog(((Button) event.getSource()).getScene().getWindow());
 
         if (fichierTemp != null) {
-            fichier = fichierTemp;
-            fileChooser_textfield.setText(fichier.getAbsolutePath());
+            fichierSortant = fichierTemp;
+            fileChooser_textfield.setText(fichierSortant.getAbsolutePath());
         }
     }
 
@@ -101,22 +102,26 @@ public class FXMLDocumentController implements Initializable, Observer {
         Receiver server = new Receiver();
         server.addObserver(this);
         server.start();
-
-        try {
-            out = new FileOutputStream(file);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-        }
     }
 
     @Override
     public void update(Observable o, Object arg) {
         if (o instanceof Receiver) {
+            byte[] message = (byte[]) arg;
+
             // Recois l'indication d'ecrire le message
-            writeToFile((byte[]) arg);
+            if (message[0] == START_OF_HEADING) {
+                String filename = "";
+                for (int i = 1; i < message.length; i++) {
+                    filename += new String(new byte[]{message[i]});
+                }
+                createFile(filename);
+            } else {
+                writeToFile(message);
+            }
         } else if (o instanceof Sender) {
             // Recois l'indication d'obtenir le message
-            ((Sender) o).setBuffer(readFile());
+            ((Sender) o).setBuffer(readFromFile());
         }
     }
 
@@ -136,44 +141,67 @@ public class FXMLDocumentController implements Initializable, Observer {
     }
 
     /**
-     * 
-     * @return 
+     *
+     * @return
      */
-    private byte[] readFile() {
+    private byte[] readFromFile() {
 
         byte[] data = new byte[taille];
+
         int bytesRead = 0;
 
         if (fis == null) {
+            int longueurFilenameBytes = fichierSortant.getName().getBytes().length + 1;
+            data = new byte[longueurFilenameBytes];
+            data[0] = START_OF_HEADING;
+
+            System.arraycopy(fichierSortant.getName().getBytes(), 0, data, 1, data.length - 1);
+
             try {
-                fis = new FileInputStream(fichier);
+                fis = new FileInputStream(fichierSortant);
                 //bis = new BufferedInputStream(fis);
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
             }
 
             isClosed = false;
+        } else {
+            try {
+
+                if (!isClosed) {
+
+                    // Si le nombre de octets restant est inférieur au taille du buffer saisie
+                    if (fis.available() < taille) {
+                        data = new byte[fis.available()];
+                    }
+
+                    do {
+                        content = fis.read();
+                        if (content != -1) {
+                            data[bytesRead] = (byte) content;
+                            bytesRead++;
+                        } else {
+                            fis.close();
+                            isClosed = true;
+                        }
+                    } while ((content != -1) && bytesRead < taille);
+                } else if (isClosed) {
+                    data[0] = END_OF_TRANSMISSION;
+                    data[1] = DATA_LINK_ESCAPE;
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
 
-        try {
-            if (!isClosed) {
-                do {
-                    content = fis.read();
-                    if (content != -1) {
-                        data[bytesRead] = (byte) content;
-                        bytesRead++;
-                    } else {
-                        fis.close();
-                        isClosed = true;
-                    }
-                } while ((content != -1) && bytesRead < 1024);
-            } else if (isClosed) {
-                data[0] = END_OF_TRANSMISSION;
-                data[1] = DATA_LINK_ESCAPE;
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-        }
         return data;
+    }
+
+    private void createFile(String filename) {
+        try {
+            out = new FileOutputStream(fichierEntrant = new File(pathDownload + filename));
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }
