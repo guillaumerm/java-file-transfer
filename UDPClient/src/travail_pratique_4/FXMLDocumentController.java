@@ -5,20 +5,14 @@
  */
 package travail_pratique_4;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.ResourceBundle;
@@ -41,8 +35,9 @@ public class FXMLDocumentController implements Initializable, Observer {
     private Sender client;
     private File fichier;
     private InetAddress addressDestination;
-    private File file = new File("C:/Users/" + System.getProperty("user.name") + "/Downloads/text.txt");
+    private File file = new File("C:/Users/"+System.getProperty("user.name")+"/Downloads/text.txt");
     private final static char END_OF_TRANSMISSION = ((char) 37);
+    private final static char DATA_LINK_ESCAPE = ((char) 16);
     private FileOutputStream out = null;
     private BufferedOutputStream bos = null;
 
@@ -107,12 +102,6 @@ public class FXMLDocumentController implements Initializable, Observer {
     @Override
     public void update(Observable o, Object arg) {
         if (o instanceof Receiver) {
-            trame_textarea.setPrefRowCount(trame_textarea.getPrefRowCount());
-            try {
-                trame_textarea.setText(new String(((byte[]) arg), "UTF-8"));
-            } catch (UnsupportedEncodingException ex) {
-                Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-            }
             writeToFile((byte[]) arg);
         }
     }
@@ -120,7 +109,7 @@ public class FXMLDocumentController implements Initializable, Observer {
     public void writeToFile(byte[] message) {
         try {
             if (message != null) {
-                if (message[0] == END_OF_TRANSMISSION) {
+                if (message[0] == END_OF_TRANSMISSION && message[1] == DATA_LINK_ESCAPE) {
                     out.flush();
                     out.close();
                 } else {

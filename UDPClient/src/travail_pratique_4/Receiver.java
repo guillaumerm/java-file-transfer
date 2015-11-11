@@ -5,19 +5,12 @@
  */
 package travail_pratique_4;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Observable;
-import java.util.Observer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +24,7 @@ public class Receiver extends Observable {
     private boolean running = true;
     private byte numeroAck = 0;
     private InetAddress addressDestination;
+    private int portDestination;
 
     public Receiver() {
         try {
@@ -49,7 +43,7 @@ public class Receiver extends Observable {
     }
 
     private Trame receptionTrameSeq() {
-        byte[] receiveData = new byte[1024];
+        byte[] receiveData = new byte[1028];
 
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
@@ -60,6 +54,7 @@ public class Receiver extends Observable {
         }
 
         addressDestination = receivePacket.getAddress();
+        portDestination = receivePacket.getPort();
 
         return new Trame(receivePacket.getData());
     }
@@ -68,10 +63,12 @@ public class Receiver extends Observable {
 
         String accusee = "ACK " + numeroAck;
 
-        Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAck, accusee.getBytes());
+        byte numeroAckTemp = (numeroAck == 0) ? (byte) Trame.TRAME_NUM0 : (byte) Trame.TRAME_NUM1;
 
-        DatagramPacket sendPacket = new DatagramPacket(trameAccuse.toBytes(), trameAccuse.toBytes().length, addressDestination, 9786);
-        
+        Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAckTemp, accusee.getBytes());
+
+        DatagramPacket sendPacket = new DatagramPacket(trameAccuse.toBytes(), trameAccuse.toBytes().length, addressDestination, portDestination);
+
         try {
             serverSocket.send(sendPacket);
         } catch (IOException ex) {
@@ -85,11 +82,14 @@ public class Receiver extends Observable {
      */
     public void OnReceiveData() {
         while (running) {
-            
+
             Trame trameEnvoie = receptionTrameSeq();
 
-            if (trameEnvoie.numero == numeroAck) {
+            byte numeroAckTemp = (numeroAck == 0) ? (byte) Trame.TRAME_NUM0 : (byte) Trame.TRAME_NUM1;
 
+            if (trameEnvoie.numero == numeroAckTemp) {
+
+                System.out.println("Reception: (" + trameEnvoie.toString() + ") " + new String(trameEnvoie.message));
                 incrementerAck();
 
                 //Remontre trame

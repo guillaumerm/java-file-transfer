@@ -19,23 +19,23 @@ public class Trame {
 
     public final static byte TRAME_NUM1 = ((char) 49);
 
-    public byte[] message;
+    public final byte[] message;
 
     public final byte type;
 
     public final byte numero;
 
-    private final static char START_OF_TEXT = ((char) 02);
+    public final static char START_OF_TEXT = ((char) 02);
 
-    private final static char END_OF_TEXT = ((char) 03);
+    public final static char END_OF_TEXT = ((char) 03);
 
     public Trame(byte[] trameByte) {
         byte[] tampon = new byte[trameByte.length - 2];
         int charDansTampon = 0;
 
-        for (int i = 0; i < (trameByte.length - 1); i++) {
+        for (int i = 0; i < trameByte.length; i++) {
 
-            if (trameByte[i] != ((byte) START_OF_TEXT) && trameByte[i] != ((byte) END_OF_TEXT)) {
+            if ((i != 0) && (i != (trameByte.length - 1))) {
                 tampon[charDansTampon++] = trameByte[i];
             }
         }
@@ -45,29 +45,29 @@ public class Trame {
 
         message = new byte[tampon.length - 2];
 
-        for (int j = 0; j < message.length - 1; j++) {
-            message[j] = tampon[2 + j];
+        for (int j = 0; j < message.length; j++) {
+            message[j] = tampon[j + 2];
         }
     }
 
     public byte[] toBytes() {
-        byte[] trame = new byte[ 4 + message.length];
-        for (int i = 0; i < trame.length - 1; i++) {
-            if (i == 0) {
-                trame[i] = (byte) START_OF_TEXT;
-            } else if (i == 1) {
-                trame[i] = type;
-            } else if (i == 2) {
-                trame[i] = numero;
-            } else if (i == 3) {
-                for (int k = 0; k < message.length; k++) {
-                    trame[i + k] = message[k];
-                }
-            } else if (i == trame.length - 1) {
-                trame[i] = (byte) END_OF_TEXT;
-            }
-        }
+        byte[] trame = new byte[(4 + message.length)];
 
+        //Header de trame
+        trame[0] = START_OF_TEXT;
+        
+        //Type de trame
+        trame[1] = type;
+        
+        //Numero de trame
+        trame[2] = numero;
+        
+        //Ajout du message
+        System.arraycopy(message, 0, trame, 3, message.length);
+        
+        //Tail de trame
+        trame[trame.length - 1] = END_OF_TEXT;
+        
         return trame;
     }
 
@@ -78,7 +78,7 @@ public class Trame {
     }
 
     public String toString() {
-        return Character.toString(START_OF_TEXT) + type + numero + message.toString() + Character.toString(END_OF_TEXT);
+        return type + " " + numero;
     }
 
 }

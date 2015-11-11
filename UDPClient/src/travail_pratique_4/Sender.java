@@ -5,12 +5,9 @@
  */
 package travail_pratique_4;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
@@ -18,8 +15,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.logging.Level;
@@ -31,15 +26,17 @@ import java.util.logging.Logger;
  */
 public class Sender implements Observer {
 
+    public byte[] bytes;
+    private InputStream fis = null;
     private DatagramSocket clientSocket;
     private InetAddress addressDestination;
     private byte numeroSeq = 0;
     private final static char END_OF_TRANSMISSION = ((char) 37);
+    private final static char DATA_LINK_ESCAPE = ((char) 16);
     private FxTimer timer;
     private boolean running = true;
-    private List<byte[]> bufferTransmission;
+    private boolean isClosed = true;
     private File fichier;
-    private final Object flag = new Object();
 
     /**
      *
@@ -58,11 +55,7 @@ public class Sender implements Observer {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        bufferTransmission = new LinkedList();
-
-        for (int i = 0; i < 2; i++) {
-            bufferTransmission.add(null);
-        }
+        bytes = new byte[1024];
 
         timer = new FxTimer(1000);
     }
@@ -70,29 +63,27 @@ public class Sender implements Observer {
     public void start(File fichier) {
         this.fichier = fichier;
 
-        new Thread(() -> {
-            readFile();
-        }).start();
-
-        synchronized (flag) {
-            try {
-                flag.wait();
-            } catch (InterruptedException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-
         timer.start();
+        bytes = readFile();
 
-        envoyerTrameSeq(bufferTransmission.get(numeroSeq));
+        new Thread(() -> {
+            envoyerTrameSeq();
+            OnReceiveData();
+        }, "Sender Client").start();
+
     }
 
     private void incrementerSeq() {
         numeroSeq = (byte) (++numeroSeq % 2);
     }
 
-    public void envoyerTrameSeq(byte[] data) {
-        Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroSeq, data);
+    public void envoyerTrameSeq() {
+        byte numeroTrameTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
+
+        Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroTrameTemp, bytes);
+
+        String trameMessageTemp = new String(trame.message);
+        System.out.println("Envoie: (" + trame.toString()+") " + trameMessageTemp);
 
         final byte[] sendTrame = trame.toBytes();
 
@@ -128,82 +119,76 @@ public class Sender implements Observer {
 
             Trame trameAccuse = receptionTrameAck();
 
+            //TODO voir si seq perdu 2 fois
+            if (bytes[0] == END_OF_TRANSMISSION) {
+                running = false;
+            }
+
             timer.cancel();
 
-            if (trameAccuse.numero != numeroSeq) {
+            byte numeroSeqTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
+            
+            if (trameAccuse.numero != numeroSeqTemp) {
 
-                bufferTransmission.set(numeroSeq, null);
+                bytes = readFile();
 
                 incrementerSeq();
 
-                synchronized (flag) {
-                    flag.notifyAll();
-                }
-
             }
 
-            if (bufferTransmission.get(0) == null && bufferTransmission.get(1) == null) {
-                envoyerTrameSeq(new byte[]{END_OF_TRANSMISSION});
-            } else {
-                envoyerTrameSeq(bufferTransmission.get(numeroSeq));
-            }
+            envoyerTrameSeq();
 
         }
 
     }
 
-    private void readFile() {
-
-        InputStream fis = null;
-
-        try {
-            fis = new FileInputStream(fichier);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        BufferedInputStream bis = new BufferedInputStream(fis);
+    private byte[] readFile() {
 
         byte[] data = new byte[1024];
-        int content;
+        int content = -1;
         int bytesRead = 0;
 
+        if (fis == null) {
+            try {
+                fis = new FileInputStream(fichier);
+                //bis = new BufferedInputStream(fis);
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+            isClosed = false;
+        }
+
         try {
-            while ((content = fis.read()) != -1) {
-                if (bufferTransmission.contains(null)) {
+            if (!isClosed) {
+                while (((content = fis.read()) != -1) && bytesRead < 1024) {
                     data[bytesRead] = (byte) content;
                     bytesRead++;
 
-                    if (bytesRead == 1024) {
-                        bufferTransmission.set(numeroSeq % 2, data.clone());
-
-                        synchronized (flag) {
-                            flag.notifyAll();
-                        }
-
-                        data = new byte[1024];
-                        bytesRead = 0;
-                    }
-                } else {
-                    synchronized (flag) {
-                        try {
-                            flag.wait();
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
                 }
             }
+
+            if (isClosed || (content == -1 && bytesRead == 0)) {
+                if (!isClosed) {
+                    fis.close();
+                    isClosed = true;
+                }
+
+                data[0] = END_OF_TRANSMISSION;
+                data[1] = DATA_LINK_ESCAPE;
+            }
+
         } catch (IOException ex) {
-            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
+        return data;
     }
 
     @Override
     public void update(Observable o, Object arg) {
         if (o instanceof FxTimer) {
             ((FxTimer) o).cancel();
-            envoyerTrameSeq(bufferTransmission.get(numeroSeq));
+            envoyerTrameSeq();
         }
     }
 }
