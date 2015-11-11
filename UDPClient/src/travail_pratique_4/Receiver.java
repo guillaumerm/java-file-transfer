@@ -38,6 +38,10 @@ public class Receiver extends Observable {
         new Thread(new TaskReceiveData()).start();
     }
 
+    public void stop() {
+        this.serverSocket.close();
+    }
+
     private void incrementerAck() {
         numeroAck = (byte) (++numeroAck % 2);
     }
@@ -49,6 +53,8 @@ public class Receiver extends Observable {
 
         try {
             serverSocket.receive(receivePacket);
+        } catch (SocketException sEx) {
+            receivePacket = null;
         } catch (IOException ex) {
             Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
         }

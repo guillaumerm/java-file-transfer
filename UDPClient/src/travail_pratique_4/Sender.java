@@ -24,19 +24,16 @@ import java.util.logging.Logger;
  *
  * @author Guillaume Rochefort-Mathieu
  */
-public class Sender implements Observer {
+public class Sender extends Observable implements Observer {
 
-    public byte[] bytes;
-    private InputStream fis = null;
+    private byte[] bytes;
     private DatagramSocket clientSocket;
     private InetAddress addressDestination;
     private byte numeroSeq = 0;
     private final static char END_OF_TRANSMISSION = ((char) 37);
-    private final static char DATA_LINK_ESCAPE = ((char) 16);
     private FxTimer timer;
     private boolean running = true;
-    private boolean isClosed = true;
-    private File fichier;
+    public final static Object flag = new Object();
 
     /**
      *
@@ -55,22 +52,25 @@ public class Sender implements Observer {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        bytes = new byte[1024];
-
         timer = new FxTimer(1000);
     }
 
-    public void start(File fichier) {
-        this.fichier = fichier;
+    public void start() {
 
+        obtenirMessage();
+        
         timer.start();
-        bytes = readFile();
-
+        
         new Thread(() -> {
             envoyerTrameSeq();
             OnReceiveData();
         }, "Sender Client").start();
 
+    }
+
+    private void obtenirMessage() {
+        setChanged();
+        notifyObservers();
     }
 
     private void incrementerSeq() {
@@ -83,7 +83,7 @@ public class Sender implements Observer {
         Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroTrameTemp, bytes);
 
         String trameMessageTemp = new String(trame.message);
-        System.out.println("Envoie: (" + trame.toString()+") " + trameMessageTemp);
+        System.out.println("Envoie: (" + trame.toString() + ") " + trameMessageTemp);
 
         final byte[] sendTrame = trame.toBytes();
 
@@ -127,10 +127,10 @@ public class Sender implements Observer {
             timer.cancel();
 
             byte numeroSeqTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
-            
+
             if (trameAccuse.numero != numeroSeqTemp) {
 
-                bytes = readFile();
+                obtenirMessage();
 
                 incrementerSeq();
 
@@ -142,46 +142,8 @@ public class Sender implements Observer {
 
     }
 
-    private byte[] readFile() {
-
-        byte[] data = new byte[1024];
-        int content = -1;
-        int bytesRead = 0;
-
-        if (fis == null) {
-            try {
-                fis = new FileInputStream(fichier);
-                //bis = new BufferedInputStream(fis);
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            
-            isClosed = false;
-        }
-
-        try {
-            if (!isClosed) {
-                while (((content = fis.read()) != -1) && bytesRead < 1024) {
-                    data[bytesRead] = (byte) content;
-                    bytesRead++;
-
-                }
-            }
-
-            if (isClosed || (content == -1 && bytesRead == 0)) {
-                if (!isClosed) {
-                    fis.close();
-                    isClosed = true;
-                }
-
-                data[0] = END_OF_TRANSMISSION;
-                data[1] = DATA_LINK_ESCAPE;
-            }
-
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return data;
+    public void setBuffer(byte[] bytes) {
+        this.bytes = bytes;
     }
 
     @Override
