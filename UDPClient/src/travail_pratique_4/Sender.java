@@ -10,26 +10,31 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.application.Platform;
 
 /**
  *
  * @author Guillaume Rochefort-Mathieu
  */
-public class Sender extends Observable implements Observer {
+public class Sender extends Observable {
 
     private byte[] bytes;
     private DatagramSocket clientSocket;
     private InetAddress addressDestination;
     private byte numeroSeq = 0;
     private final static char END_OF_TRANSMISSION = ((char) 37);
-    private FxTimer timer;
+    private final static char DATA_LINK_ESCAPE = ((char) 16);
+    private boolean erreurExecuter = false;
     private boolean running = true;
-    public final static Object flag = new Object();
+    private int numeroTrameErreur = -1;
+    private int nombreTrame = 0;
+    private static final int TIMEOUT = 1000;
 
     /**
      *
@@ -47,24 +52,26 @@ public class Sender extends Observable implements Observer {
         } catch (UnknownHostException ex) {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        timer = new FxTimer(1000);
     }
 
-    public void start() {
+    public void start(int numErreurTrame) {
+
+        numeroTrameErreur = numErreurTrame;
 
         obtenirMessage();
 
-        timer.start();
+        new Thread(new TaskSendData(), "Sender").start();
 
-        new Thread(() -> {
-            envoyerTrameSeq();
-            OnReceiveData();
-        }, "Sender Client").start();
+        running = true;
+    }
 
+    public void stop() {
+        running = false;
+        clientSocket.close();
     }
 
     private void obtenirMessage() {
+        nombreTrame++;
         setChanged();
         notifyObservers();
     }
@@ -73,77 +80,83 @@ public class Sender extends Observable implements Observer {
         numeroSeq = (byte) (++numeroSeq % 2);
     }
 
-    public void envoyerTrameSeq() {
+    public void envoyerTrameSeq() throws IOException {
         byte numeroTrameTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
 
         Trame trame = new Trame(Trame.TRAME_ENVOIE, numeroTrameTemp, bytes);
 
-        final byte[] sendTrame = trame.toBytes();
+        //Pour raison d'affichage je dois remonter la trame pour que le controlleur aille accès au numero
+        setChanged();
+        notifyObservers(trame);
 
-        DatagramPacket sendPacket = new DatagramPacket(sendTrame, sendTrame.length, addressDestination, 9786);
+        if (numeroTrameErreur != nombreTrame) {
+            final byte[] sendTrame = trame.toBytes();
 
-        try {
+            DatagramPacket sendPacket = new DatagramPacket(sendTrame, sendTrame.length, addressDestination, 9786);
+
             clientSocket.send(sendPacket);
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+        } else {
+            nombreTrame++;
         }
-    }
-
-    public Trame receptionTrameAck() {
-        final byte[] receiveData = new byte[1024];
-
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-        try {
-            clientSocket.receive(receivePacket);
-        } catch (IOException ex) {
-            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        return new Trame(receivePacket.getData());
     }
 
     /**
      *
      * @param data
      */
-    public void OnReceiveData() {
+    public void OnReceiveData() throws IOException {
+        clientSocket.setSoTimeout(TIMEOUT);
         while (running) {
 
-            Trame trameAccuse = receptionTrameAck();
+            final byte[] receiveData = new byte[1024];
 
-            //TODO voir si seq perdu 2 fois
-            if (bytes[0] == END_OF_TRANSMISSION) {
-                running = false;
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+
+            try {
+                clientSocket.receive(receivePacket);
+
+                Trame trameAccuse = new Trame(receivePacket.getData());
+
+                //TODO voir si seq perdu 2 fois
+                if (bytes[0] == END_OF_TRANSMISSION && bytes[1] == DATA_LINK_ESCAPE) {
+                    running = false;
+                } else {
+
+                    byte numeroSeqTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
+
+                    if (trameAccuse.numero != numeroSeqTemp) {
+
+                        incrementerSeq();
+
+                        obtenirMessage();
+
+                    }
+
+                    envoyerTrameSeq();
+                }
+            } catch (SocketTimeoutException ex) {
+                envoyerTrameSeq();
             }
-
-            timer.cancel();
-
-            byte numeroSeqTemp = (numeroSeq == 0) ? Trame.TRAME_NUM0 : Trame.TRAME_NUM1;
-
-            if (trameAccuse.numero != numeroSeqTemp) {
-
-                incrementerSeq();
-
-                obtenirMessage();
-
-            }
-
-            envoyerTrameSeq();
-
         }
-
     }
 
     public void setBuffer(byte[] bytes) {
         this.bytes = bytes;
     }
 
-    @Override
-    public void update(Observable o, Object arg) {
-        if (o instanceof FxTimer) {
-            ((FxTimer) o).cancel();
-            envoyerTrameSeq();
+    /**
+     *
+     */
+    private class TaskSendData implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                envoyerTrameSeq();
+                OnReceiveData();
+            } catch (IOException ex) {
+                running = false;
+            }
         }
     }
 }

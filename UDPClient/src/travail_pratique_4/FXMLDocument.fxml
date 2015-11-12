@@ -24,10 +24,12 @@
       <HBox prefHeight="35.0" prefWidth="600.0">
          <children>
             <Label fx:id="size_label" text="Size: " />
-            <TextField fx:id="size_textfield" />
+            <TextField fx:id="size_textfield" prefHeight="25.0" prefWidth="70.0" />
+            <Label text="# trame erreur: " />
+            <TextField fx:id="trameErreur_textfield" prefHeight="25.0" prefWidth="78.0" />
          </children>
       </HBox>
-      <TextArea fx:id="trame_textarea" prefHeight="200.0" prefWidth="200.0" />
+      <ListView fx:id="trame_listview" prefHeight="200.0" prefWidth="200.0" />
       <Button fx:id="send_button" mnemonicParsing="false" onAction="#onSend" text="Send" />
    </children>
 </VBox>

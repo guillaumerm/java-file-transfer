@@ -35,10 +35,11 @@ public class Receiver extends Observable {
     }
 
     public void start() {
-        new Thread(new TaskReceiveData()).start();
+        new Thread(new TaskReceiveData(), "Receiver").start();
     }
 
     public void stop() {
+        running = false;
         this.serverSocket.close();
     }
 
@@ -46,18 +47,12 @@ public class Receiver extends Observable {
         numeroAck = (byte) (++numeroAck % 2);
     }
 
-    private Trame receptionTrameSeq() {
+    private Trame receptionTrameSeq() throws IOException {
         byte[] receiveData = new byte[1028];
 
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
-        try {
-            serverSocket.receive(receivePacket);
-        } catch (SocketException sEx) {
-            receivePacket = null;
-        } catch (IOException ex) {
-            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        serverSocket.receive(receivePacket);
 
         addressDestination = receivePacket.getAddress();
         portDestination = receivePacket.getPort();
@@ -70,9 +65,9 @@ public class Receiver extends Observable {
             nombreByteNull++;
             aByte = receivePacket.getData()[--index];
         }
-        
+
         byte[] trameBytes = new byte[receivePacket.getData().length - nombreByteNull];
-        
+
         System.arraycopy(receivePacket.getData(), 0, trameBytes, 0, trameBytes.length);
 
         return new Trame(trameBytes);
@@ -86,6 +81,9 @@ public class Receiver extends Observable {
 
         Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAckTemp, accusee.getBytes());
 
+        setChanged();
+        notifyObservers(trameAccuse);
+
         DatagramPacket sendPacket = new DatagramPacket(trameAccuse.toBytes(), trameAccuse.toBytes().length, addressDestination, portDestination);
 
         try {
@@ -98,8 +96,9 @@ public class Receiver extends Observable {
 
     /**
      *
+     * @throws java.net.SocketException
      */
-    public void OnReceiveData() {
+    public void OnReceiveData() throws IOException {
         while (running) {
 
             Trame trameEnvoie = receptionTrameSeq();
@@ -112,17 +111,11 @@ public class Receiver extends Observable {
 
                 //Remontre trame
                 setChanged();
-                notifyObservers(trameEnvoie.message);
+                notifyObservers(trameEnvoie);
 
             }
 
             envoyerTrameAck();
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }
 
@@ -133,7 +126,11 @@ public class Receiver extends Observable {
 
         @Override
         public void run() {
-            OnReceiveData();
+            try {
+                OnReceiveData();
+            } catch (IOException ex) {
+                serverSocket = null;
+            }
         }
     }
 }
