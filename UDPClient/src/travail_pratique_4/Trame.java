@@ -7,7 +7,7 @@ package travail_pratique_4;
 
 /**
  *
- * @author Gus
+ * @author Guillaume Rochefort-Mathieu & Terry Turcotte
  */
 public class Trame {
 
@@ -55,19 +55,19 @@ public class Trame {
 
         //Header de trame
         trame[0] = START_OF_TEXT;
-        
+
         //Type de trame
         trame[1] = type;
-        
+
         //Numero de trame
         trame[2] = numero;
-        
+
         //Ajout du message
         System.arraycopy(message, 0, trame, 3, message.length);
-        
+
         //Tail de trame
         trame[trame.length - 1] = END_OF_TEXT;
-        
+
         return trame;
     }
 
@@ -78,7 +78,7 @@ public class Trame {
     }
 
     public String toString() {
-        return type + " " + numero;
+        return new String(new byte[]{type}) + " " + new String(new byte[]{numero}) + "" + new String(message);
     }
 
 }

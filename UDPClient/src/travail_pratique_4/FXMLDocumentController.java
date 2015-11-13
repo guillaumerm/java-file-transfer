@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package travail_pratique_4;
 
 import java.io.File;
@@ -12,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -33,8 +29,10 @@ import javafx.scene.control.TextField;
 import javafx.stage.FileChooser;
 
 /**
+ * Classe controller pour une application qui permet de transfèrer un fichier
+ * d'un ordianteur à un autre.
  *
- * @author Guillaume
+ * @author Guillaume Rochefort-Mathieu & Terry Turcotte
  */
 public class FXMLDocumentController implements Initializable, Observer {
 
@@ -55,6 +53,9 @@ public class FXMLDocumentController implements Initializable, Observer {
     private EtatClient etatClient = EtatClient.READY;
     private int numErreurTrame = 0;
 
+    /**
+     * Les états du client qui s'occupe de l'envoie d'un fichier
+     */
     private enum EtatClient {
 
         READY, TRANSMITTING, FINISHING
@@ -94,7 +95,7 @@ public class FXMLDocumentController implements Initializable, Observer {
     /**
      * Méthode appelé lorsqu'on click sur le bouton send.
      *
-     * @param event
+     * @param event la node graphique qui appel cette indication
      */
     @FXML
     private void onSend(ActionEvent event) {
@@ -109,12 +110,25 @@ public class FXMLDocumentController implements Initializable, Observer {
             Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        taille = Integer.parseInt(size_textfield.getText());
-        numErreurTrame = Integer.parseInt(trameErreur_textfield.getText());
+        try {
+            taille = Integer.parseInt(size_textfield.getText());
+        } catch (NumberFormatException e) {
+            taille = 1024;
+        }
+
+        try {
+            numErreurTrame = Integer.parseInt(trameErreur_textfield.getText());
+        } catch (NumberFormatException e) {
+            numErreurTrame = 0;
+        }
 
         client.start(numErreurTrame);
     }
 
+    /**
+     * Méthode appelé lorsque l'application qui pour fermer les sockets
+     * transmetteur et recepteur.
+     */
     public void stop() {
         if (client != null) {
             client.stop();
@@ -148,41 +162,34 @@ public class FXMLDocumentController implements Initializable, Observer {
     }
 
     /**
+     * Démonte la trame et interpret les données envoyé.
      *
      * @param trame
      */
     private void demonterTrame(Trame trame) {
         if (trame.type == Trame.TRAME_ENVOIE) {
-            if (trame.message[0] == START_OF_HEADING) {
+            if (trame.message[0] == START_OF_HEADING && trame.message[1] == DATA_LINK_ESCAPE) {
                 //Cette trame contient le nom du fichier qui sera transmis
                 String filename = "";
-                for (int i = 1; i < trame.message.length; i++) {
-                    filename += new String(new byte[]{trame.message[i]});
+
+                for (int i = 2; i < trame.message.length; i++) {
+                    try {
+                        filename += new String(new byte[]{trame.message[i]}, "UTF-8");
+                    } catch (UnsupportedEncodingException ex) {
+                        Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
-                createFile(filename);
+
+                try {
+                    out = new FileOutputStream(fichierEntrant = new File(pathDownload + filename));
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+                }
             } else {
                 //Cette trame contient des données du fichier qui est transmis
-                writeToFile(trame.message);
-            }
-        } else {
-            //La trame est remonter avant l'envoyer pour obtenir le numero et le type pour l'affiche de la trace historique
-            ajouterTraceTrame(trame.type, trame.numero, "TRANSMISSION ENTRANT: " + fichierEntrant.getName());
-        }
-    }
-
-    @Override
-    public void update(Observable o, Object arg) {
-        if (o instanceof Receiver) {
-            Trame trame = (Trame) arg;
-
-            demonterTrame(trame);
-        } else if (o instanceof Sender) {
-            if (arg instanceof Trame) {
-                Trame trame = (Trame) arg;
-                ajouterTraceTrame(trame.type, trame.numero, "TRANSMISSION SORTANT: " + fichierSortant.getName());
-            } else {
-                // Recois l'indication de remplir le buffer du sender
-                ((Sender) o).setBuffer(obtenirContenuPourTransfere());
+                if (out != null) {
+                    writeToFile(trame.message);
+                }
             }
         }
     }
@@ -198,6 +205,7 @@ public class FXMLDocumentController implements Initializable, Observer {
                     //Indicateur de fin de transmission
                     out.flush();
                     out.close();
+                    out = null;
                 } else {
                     out.write(message);
                 }
@@ -208,7 +216,8 @@ public class FXMLDocumentController implements Initializable, Observer {
     }
 
     /**
-     * Lit le nombre de byte de la taille saisie du fichier sélectionné
+     * Obtient le contenu nécessaire pour le transfère tout dépendant de l'état
+     * du client.
      *
      * @return buffer pour l'envoie
      */
@@ -217,20 +226,27 @@ public class FXMLDocumentController implements Initializable, Observer {
         byte[] data = new byte[taille];
 
         if (etatClient == EtatClient.READY) {
-            int longueurFilenameBytes = fichierSortant.getName().getBytes().length + 1;
-            data = new byte[longueurFilenameBytes];
+            // Le client transmetera en premier lieu le nom du fichier qui sera transmis
+            data = new byte[fichierSortant.getName().getBytes().length + 2];
+
             data[0] = START_OF_HEADING;
+            data[1] = DATA_LINK_ESCAPE;
 
-            System.arraycopy(fichierSortant.getName().getBytes(), 0, data, 1, data.length - 1);
+            System.arraycopy(fichierSortant.getName().getBytes(), 0, data, 2, data.length - 2);
 
-            openFile();
+            try {
+                fis = new FileInputStream(fichierSortant);
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+            }
 
             etatClient = EtatClient.TRANSMITTING;
 
         } else if (etatClient == EtatClient.TRANSMITTING) {
+            // Tant qu'il restera des octets du fichier à transférer le client reste dans l'état transmettre.
             try {
 
-                // Si le nombre de octets restant est inférieur au taille du buffer saisie
+                // Si le nombre d'octets restant est inférieur au taille du buffer saisie
                 if (fis.available() < taille) {
                     data = new byte[fis.available()];
                 }
@@ -252,35 +268,30 @@ public class FXMLDocumentController implements Initializable, Observer {
                 Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else if (etatClient == EtatClient.FINISHING) {
-            data = new byte[2];
-            data[0] = END_OF_TRANSMISSION;
-            data[1] = DATA_LINK_ESCAPE;
+            //Si le client à terminé le transférer du fichier l'indiquer au recepteur
+            data = new byte[]{END_OF_TRANSMISSION, DATA_LINK_ESCAPE};
         }
 
         return data;
     }
 
-    /**
-     *
-     */
-    private void openFile() {
-        try {
-            fis = new FileInputStream(fichierSortant);
-            //bis = new BufferedInputStream(fis);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    /**
-     *
-     * @param filename
-     */
-    private void createFile(String filename) {
-        try {
-            out = new FileOutputStream(fichierEntrant = new File(pathDownload + filename));
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+    @Override
+    public void update(Observable o, Object arg) {
+        if (o instanceof Receiver && arg instanceof Trame) {
+            Trame trame = (Trame) arg;
+            demonterTrame(trame);
+            
+            ajouterTraceTrame(trame.type, trame.numero, "TRANSMISSION ENTRANT: " + fichierEntrant.getName());
+        } else if (o instanceof Sender) {
+            // Sender est la source de l'indication
+            if (arg instanceof Trame) {
+                // Si l'objet transmis par le Sender est une trame
+                Trame trame = (Trame) arg;
+                ajouterTraceTrame(trame.type, trame.numero,"TRANSMISSION SORTANT: " + fichierSortant.getName());
+            } else {
+                // Recois l'indication de remplir le buffer du sender
+                ((Sender) o).setBuffer(obtenirContenuPourTransfere());
+            }
         }
     }
 }

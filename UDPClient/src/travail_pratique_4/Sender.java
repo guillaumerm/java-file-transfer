@@ -30,7 +30,6 @@ public class Sender extends Observable {
     private byte numeroSeq = 0;
     private final static char END_OF_TRANSMISSION = ((char) 37);
     private final static char DATA_LINK_ESCAPE = ((char) 16);
-    private boolean erreurExecuter = false;
     private boolean running = true;
     private int numeroTrameErreur = -1;
     private int nombreTrame = 0;
@@ -58,11 +57,11 @@ public class Sender extends Observable {
 
         numeroTrameErreur = numErreurTrame;
 
-        obtenirMessage();
-
-        new Thread(new TaskSendData(), "Sender").start();
+        obtenirContenurPourTransfere();
 
         running = true;
+
+        new Thread(new TaskSendData(), "Sender").start();
     }
 
     public void stop() {
@@ -70,7 +69,7 @@ public class Sender extends Observable {
         clientSocket.close();
     }
 
-    private void obtenirMessage() {
+    private void obtenirContenurPourTransfere() {
         nombreTrame++;
         setChanged();
         notifyObservers();
@@ -128,7 +127,7 @@ public class Sender extends Observable {
 
                         incrementerSeq();
 
-                        obtenirMessage();
+                        obtenirContenurPourTransfere();
 
                     }
 
@@ -141,11 +140,13 @@ public class Sender extends Observable {
     }
 
     public void setBuffer(byte[] bytes) {
-        this.bytes = bytes;
+        if (bytes != null) {
+            this.bytes = bytes;
+        }
     }
 
     /**
-     *
+     * @author Guillaume Rochefort-Mathieu & Terry Turcotte
      */
     private class TaskSendData implements Runnable {
 

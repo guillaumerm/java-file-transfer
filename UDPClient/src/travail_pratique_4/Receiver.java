@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package travail_pratique_4;
 
 import java.io.IOException;
@@ -15,11 +11,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
- * @author Guillaume
+ * Classe qui s'occupe de la reception de fichier envoyé par le "Sender".
+ * 
+ * @author Guillaume Rochefort-Mathieu & Terry Turcotte
  */
 public class Receiver extends Observable {
 
+    private final int TAILLE_BUFFER_MAX = 1400;
     private DatagramSocket serverSocket;
     private boolean running = true;
     private byte numeroAck = 0;
@@ -48,7 +46,7 @@ public class Receiver extends Observable {
     }
 
     private Trame receptionTrameSeq() throws IOException {
-        byte[] receiveData = new byte[1028];
+        byte[] receiveData = new byte[TAILLE_BUFFER_MAX];
 
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
@@ -81,6 +79,7 @@ public class Receiver extends Observable {
 
         Trame trameAccuse = new Trame(Trame.TRAME_ACK, numeroAckTemp, accusee.getBytes());
 
+        //Remonte la trame pour ajouter ca trace dans l'historique
         setChanged();
         notifyObservers(trameAccuse);
 
