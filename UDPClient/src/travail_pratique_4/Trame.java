@@ -1,8 +1,12 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/*                                                 Historique de la classe
+*
+* No Modification         Date                           Description                                                      Auteur
+*        1              11/03/2015                  Création de la classe Trame                               Guillaume R. - Mathieu + Terry Turcotte
+*
+*        2              11/10/2015                  Optimisation et nettoyage de la clase Trame.              Guillaume R. - Mathieu + Terry Turcotte
+*                                                   cela inclus de change le numero par des char car
+*                                                   l'octet 0 = NULL.
+*/
 package travail_pratique_4;
 
 /**
@@ -10,24 +14,18 @@ package travail_pratique_4;
  * @author Guillaume Rochefort-Mathieu & Terry Turcotte
  */
 public class Trame {
-
+    //Modification 1
+    
     public final static byte TRAME_ENVOIE = ((char) 83);
-
     public final static byte TRAME_ACK = ((char) 65);
-
     public final static byte TRAME_NUM0 = ((char) 48);
-
     public final static byte TRAME_NUM1 = ((char) 49);
+    public final static char START_OF_TEXT = ((char) 02);
+    public final static char END_OF_TEXT = ((char) 03);
 
     public final byte[] message;
-
     public final byte type;
-
     public final byte numero;
-
-    public final static char START_OF_TEXT = ((char) 02);
-
-    public final static char END_OF_TEXT = ((char) 03);
 
     public Trame(byte[] trameByte) {
         byte[] tampon = new byte[trameByte.length - 2];
@@ -51,6 +49,7 @@ public class Trame {
     }
 
     public byte[] toBytes() {
+        //Modification 2
         byte[] trame = new byte[(4 + message.length)];
 
         //Header de trame

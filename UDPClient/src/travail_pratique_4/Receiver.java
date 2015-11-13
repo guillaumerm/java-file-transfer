@@ -1,4 +1,13 @@
-
+/*                                                 Historique de la classe
+ *
+ * No Modification         Date                           Description                                                      Auteur
+ *        1              11/03/2015                  Création de la classe Receiver                            Guillaume R. - Mathieu + Terry Turcotte
+ *        2              11/10/2015                  Correction et optimisation de l'implémentation            Guillaume R. - Mathieu + Terry Turcotte
+ *                                                   du Stop and Wait.
+ *        3              11/11/2015                  Ajout de la possibilité que la trame est                  Guillaume R. - Mathieu
+ *                                                   d'une taille variable. 
+ *
+ */
 package travail_pratique_4;
 
 import java.io.IOException;
@@ -12,7 +21,7 @@ import java.util.logging.Logger;
 
 /**
  * Classe qui s'occupe de la reception de fichier envoyé par le "Sender".
- * 
+ *
  * @author Guillaume Rochefort-Mathieu & Terry Turcotte
  */
 public class Receiver extends Observable {
@@ -55,6 +64,7 @@ public class Receiver extends Observable {
         addressDestination = receivePacket.getAddress();
         portDestination = receivePacket.getPort();
 
+        //Modification 3
         int index = receivePacket.getData().length - 1;
         byte aByte = receivePacket.getData()[index];
         int nombreByteNull = 0;
@@ -98,6 +108,7 @@ public class Receiver extends Observable {
      * @throws java.net.SocketException
      */
     public void OnReceiveData() throws IOException {
+        //Modification 2
         while (running) {
 
             Trame trameEnvoie = receptionTrameSeq();

@@ -6,7 +6,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="217.0" prefWidth="272.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1" fx:controller="travail_pratique_4.FXMLDocumentController">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="220.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/8.0.40" xmlns:fx="http://javafx.com/fxml/1" fx:controller="travail_pratique_4.FXMLDocumentController">
    <children>
       <HBox prefHeight="31.0" prefWidth="600.0">
          <children>
@@ -17,16 +17,16 @@
       <HBox prefHeight="30.0" prefWidth="600.0">
          <children>
             <Label fx:id="fileChooser_label" text="File to send: " />
-            <TextField fx:id="fileChooser_textfield" />
+            <TextField fx:id="fileChooser_textfield" prefHeight="25.0" prefWidth="348.0" />
             <Button fx:id="fileChooser_button" mnemonicParsing="false" onAction="#onOpenFileChooser" text="..." />
          </children>
       </HBox>
-      <HBox prefHeight="35.0" prefWidth="600.0">
+      <HBox alignment="CENTER" prefHeight="35.0" prefWidth="600.0">
          <children>
             <Label fx:id="size_label" text="Size: " />
-            <TextField fx:id="size_textfield" prefHeight="25.0" prefWidth="70.0" />
+            <TextField fx:id="size_textfield" prefHeight="25.0" prefWidth="160.0" />
             <Label text="# trame erreur: " />
-            <TextField fx:id="trameErreur_textfield" prefHeight="25.0" prefWidth="78.0" />
+            <TextField fx:id="trameErreur_textfield" prefHeight="25.0" prefWidth="158.0" />
          </children>
       </HBox>
       <ListView fx:id="trame_listview" prefHeight="200.0" prefWidth="200.0" />

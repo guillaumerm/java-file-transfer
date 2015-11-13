@@ -1,3 +1,14 @@
+/*                                                 Historique de la classe
+ *
+ * No Modification         Date                           Description                                                      Auteur
+ *        1              11/03/2015                  Création de la classe FXMLDocumentController               Guillaume R. - Mathieu + Terry Turcotte
+ *        2              11/04/2015                  L'implémentation de l'utilsiation du patron de             Guillaume R. - Mathieu
+ *                                                   l'observateur car la classe Sender et Receiver sont
+ *                                                   des services de ce programme.
+ *        3              11/09/2015                  Correction de l'algorithm de lecture.                      Guillaume R. - Mathieu
+ *        4              11/10/2015                  Implémentation de l'état du client pour guider             Guillaume R. - Mathieu + Terry Turcotte
+ *                                                   le program lors de la transmission d'un fichier
+ */
 package travail_pratique_4;
 
 import java.io.File;
@@ -36,6 +47,7 @@ import javafx.stage.FileChooser;
  */
 public class FXMLDocumentController implements Initializable, Observer {
 
+    //Modification 1
     private final static String pathDownload = "C:/Users/" + System.getProperty("user.name") + "/Downloads/";
     private final static char END_OF_TRANSMISSION = ((char) 37);
     private final static char DATA_LINK_ESCAPE = ((char) 16);
@@ -152,12 +164,12 @@ public class FXMLDocumentController implements Initializable, Observer {
      * @param type type de la trame
      * @param num numero de la trame
      */
-    private void ajouterTraceTrame(byte type, byte num, String description) {
+    private void ajouterTraceTrame(String typeTransmission, byte type, byte num, String description) {
         String typeString = (type == Trame.TRAME_ACK) ? "ACK" : "SEQ";
         String numString = (num == Trame.TRAME_NUM0) ? "0" : "1";
 
         Platform.runLater(() -> {
-            trameHistorique.add(typeString + " " + numString + " " + description);
+            trameHistorique.add(typeTransmission + typeString + " " + numString + " " + description);
         });
     }
 
@@ -198,7 +210,7 @@ public class FXMLDocumentController implements Initializable, Observer {
      *
      * @param message
      */
-    public void writeToFile(byte[] message) {
+    private void writeToFile(byte[] message) {
         try {
             if (message != null) {
                 if (message[0] == END_OF_TRANSMISSION && message[1] == DATA_LINK_ESCAPE) {
@@ -215,6 +227,50 @@ public class FXMLDocumentController implements Initializable, Observer {
         }
     }
 
+    private byte[] readFromFile() {
+        //Modification 3
+        byte[] data = new byte[taille];
+        int bytesRead = 0;
+
+        try {
+            // Si le nombre d'octets restant est inférieur au taille du buffer saisie
+            if (fis.available() < taille) {
+                data = new byte[fis.available()];
+            }
+
+            do {
+                content = fis.read();
+                if (content != -1) {
+                    data[bytesRead] = (byte) content;
+                    bytesRead++;
+                } else {
+                    fis.close();
+                }
+            } while ((content != -1) && bytesRead < taille);
+        } catch (IOException ex) {
+            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        return data;
+    }
+
+    private byte[] obtenirNomFichier() {
+        byte[] data = new byte[fichierSortant.getName().getBytes().length + 2];
+
+        data[0] = START_OF_HEADING;
+        data[1] = DATA_LINK_ESCAPE;
+
+        System.arraycopy(fichierSortant.getName().getBytes(), 0, data, 2, data.length - 2);
+
+        try {
+            fis = new FileInputStream(fichierSortant);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        return data;
+    }
+
     /**
      * Obtient le contenu nécessaire pour le transfère tout dépendant de l'état
      * du client.
@@ -222,50 +278,18 @@ public class FXMLDocumentController implements Initializable, Observer {
      * @return buffer pour l'envoie
      */
     private byte[] obtenirContenuPourTransfere() {
-
-        byte[] data = new byte[taille];
+        //Modification 4
+        byte[] data = null;
 
         if (etatClient == EtatClient.READY) {
             // Le client transmetera en premier lieu le nom du fichier qui sera transmis
-            data = new byte[fichierSortant.getName().getBytes().length + 2];
-
-            data[0] = START_OF_HEADING;
-            data[1] = DATA_LINK_ESCAPE;
-
-            System.arraycopy(fichierSortant.getName().getBytes(), 0, data, 2, data.length - 2);
-
-            try {
-                fis = new FileInputStream(fichierSortant);
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
+            data = obtenirNomFichier();
             etatClient = EtatClient.TRANSMITTING;
-
         } else if (etatClient == EtatClient.TRANSMITTING) {
             // Tant qu'il restera des octets du fichier à transférer le client reste dans l'état transmettre.
-            try {
-
-                // Si le nombre d'octets restant est inférieur au taille du buffer saisie
-                if (fis.available() < taille) {
-                    data = new byte[fis.available()];
-                }
-
-                int bytesRead = 0;
-
-                do {
-                    content = fis.read();
-
-                    if (content != -1) {
-                        data[bytesRead] = (byte) content;
-                        bytesRead++;
-                    } else {
-                        fis.close();
-                        etatClient = EtatClient.FINISHING;
-                    }
-                } while ((content != -1) && bytesRead < taille);
-            } catch (IOException ex) {
-                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            data = readFromFile();
+            if (content == -1) {
+                etatClient = EtatClient.FINISHING;
             }
         } else if (etatClient == EtatClient.FINISHING) {
             //Si le client à terminé le transférer du fichier l'indiquer au recepteur
@@ -280,14 +304,17 @@ public class FXMLDocumentController implements Initializable, Observer {
         if (o instanceof Receiver && arg instanceof Trame) {
             Trame trame = (Trame) arg;
             demonterTrame(trame);
-            
-            ajouterTraceTrame(trame.type, trame.numero, "TRANSMISSION ENTRANT: " + fichierEntrant.getName());
+
+            String typeTransmission = (trame.type == Trame.TRAME_ACK) ? "TRANSMISSION SORTANT: " : "TRANSMISSION ENTRANT: ";
+
+            ajouterTraceTrame(typeTransmission, trame.type, trame.numero, fichierEntrant.getName());
         } else if (o instanceof Sender) {
             // Sender est la source de l'indication
             if (arg instanceof Trame) {
                 // Si l'objet transmis par le Sender est une trame
                 Trame trame = (Trame) arg;
-                ajouterTraceTrame(trame.type, trame.numero,"TRANSMISSION SORTANT: " + fichierSortant.getName());
+                String typeTransmission = (trame.type == Trame.TRAME_ACK) ? "TRANSMISSION ENTRANT: " : "TRANSMISSION SORTANT: ";
+                ajouterTraceTrame(typeTransmission, trame.type, trame.numero, fichierSortant.getName());
             } else {
                 // Recois l'indication de remplir le buffer du sender
                 ((Sender) o).setBuffer(obtenirContenuPourTransfere());
